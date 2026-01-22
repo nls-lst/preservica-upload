@@ -1,0 +1,13 @@
+[project]
+name = "preservica-upload"
+version = "0.1.0"
+description = "TUI tool for uploading files to Preservica"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "pypreservica>=3.3.3",
+    "textual>=7.3.0",
+]
+
+[project.scripts]
+preservica-upload = "tui:main"
