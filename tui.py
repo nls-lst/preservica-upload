@@ -3,10 +3,13 @@ Textual TUI for Preservica Upload Tool
 """
 
 import os
+import sys
 import shutil
 import tempfile
 import asyncio
 import threading
+import subprocess
+import argparse
 from pathlib import Path
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
@@ -548,6 +551,49 @@ class PreservicaUploadApp(App):
 
 def main():
     """Entry point for the console script."""
+    parser = argparse.ArgumentParser(
+        description="Preservica Upload Tool - TUI for uploading files to Preservica"
+    )
+    parser.add_argument(
+        "--update",
+        action="store_true",
+        help="Update the tool by pulling the latest changes from git",
+    )
+
+    args = parser.parse_args()
+
+    if args.update:
+        # Find the installation directory using __file__
+        install_dir = Path(__file__).parent.resolve()
+
+        print(f"Updating preservica-upload from: {install_dir}")
+        print("Running git pull...\n")
+
+        try:
+            result = subprocess.run(
+                ["git", "pull"],
+                cwd=install_dir,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            print(result.stdout)
+            if result.stderr:
+                print(result.stderr)
+            print(
+                "\n✅ Update complete! Run 'preservica-upload' to use the updated version."
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Error updating: {e}")
+            print(e.stderr)
+            sys.exit(1)
+        except FileNotFoundError:
+            print("❌ Error: git command not found. Please install git.")
+            sys.exit(1)
+
+        return
+
+    # Normal operation - launch the TUI
     app = PreservicaUploadApp()
     app.run()
 

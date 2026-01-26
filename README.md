@@ -9,13 +9,21 @@ A Terminal User Interface (TUI) application for uploading files to Preservica.
 - Automatic S3 upload for large files (>= 100MB)
 - Progress tracking during uploads
 
+## Requirements
+
+### uv
+
+```bash
+# Windows
+
+winget install --id=astral-sh.uv  -e
+
+### Linux
+
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
 ## Installation
-
-### For end users (editable install - recommended):
-
-This allows you to `git pull` updates without reinstalling.
-
-**Using uv:**
 
 ```bash
 # Clone the repository
@@ -26,34 +34,39 @@ cd preservica-upload
 uv tool install -e .
 
 # Later, to update:
-git pull
+preservica-upload --update
 ```
 
 ## Configuration
 
 Set the following environment variables:
 
-### Windows:
+### Windows (PowerShell)
+
+**Permanent (saved to user environment):**
 
 ```powershell
-$env:PRESERVICA_USERNAME="your-username"
-$env:PRESERVICA_PASSWORD="your-password"
-$env:PRESERVICA_SERVER="your-tenant.preservica.com"
-$env:PRESERVICA_BUCKET="your-s3-bucket-name.put.holding"
-# Optional: S3 upload threshold in MB (default: 100)
-$env:PRESERVICA_S3_THRESHOLD="100"
+[System.Environment]::SetEnvironmentVariable("PRESERVICA_USERNAME", "your-username", "User")
+[System.Environment]::SetEnvironmentVariable("PRESERVICA_PASSWORD", "your-password", "User")
+[System.Environment]::SetEnvironmentVariable("PRESERVICA_SERVER", "your-tenant.preservica.com", "User")
+[System.Environment]::SetEnvironmentVariable("PRESERVICA_BUCKET", "your-s3-bucket-name.put.holding", "User")
+[System.Environment]::SetEnvironmentVariable("PRESERVICA_S3_THRESHOLD", "100", "User")
 ```
 
 ### Linux
 
+**Add to ~/.bashrc or ~/.zshrc (or in an .env file that you source):**
+
 ```bash
+# Add these lines to ~/.bashrc or ~/.zshrc
 export PRESERVICA_USERNAME="your-username"
 export PRESERVICA_PASSWORD="your-password"
 export PRESERVICA_SERVER="your-tenant.preservica.com"
 export PRESERVICA_BUCKET="your-s3-bucket-name.put.holding"
-# Optional: S3 upload threshold in MB (default: 100)
 export PRESERVICA_S3_THRESHOLD="100"
 ```
+
+Then reload your shell config: `source ~/.bashrc` or `source ~/.zshrc`
 
 ## Usage
 
