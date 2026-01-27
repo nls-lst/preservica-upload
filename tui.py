@@ -411,12 +411,14 @@ class PreservicaUploadApp(App):
                         bucket_name=BUCKET,
                         folder=self.selected_preservica_folder,
                         callback=callback,
+                        delete_after_upload=True,
                     )
                 else:
                     result = self.upload_client.upload_zip_package(
                         path_to_zip_package=zip_package,
                         folder=self.selected_preservica_folder,
                         callback=callback,
+                        delete_after_upload=True,
                     )
 
                 # Upload complete
@@ -489,19 +491,15 @@ class PreservicaUploadApp(App):
                         bucket_name=BUCKET,
                         folder=self.selected_preservica_folder,
                         callback=callback,
+                        delete_after_upload=True,
                     )
                 else:
                     result = self.upload_client.upload_zip_package(
                         path_to_zip_package=zip_file,
                         folder=self.selected_preservica_folder,
                         callback=callback,
+                        delete_after_upload=True,
                     )
-
-                # Clean up temporary zip file
-                try:
-                    os.remove(zip_file)
-                except:
-                    pass
 
                 # Upload complete
                 def hide_progress():
@@ -555,7 +553,9 @@ def main():
         description="Preservica Upload Tool - TUI for uploading files to Preservica"
     )
     parser.add_argument(
-        "-u", "--update", "--upgrade",
+        "-u",
+        "--update",
+        "--upgrade",
         action="store_true",
         help="Update the tool by pulling the latest changes from git",
     )
