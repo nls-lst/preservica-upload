@@ -555,7 +555,7 @@ def main():
         description="Preservica Upload Tool - TUI for uploading files to Preservica"
     )
     parser.add_argument(
-        "--update",
+        "-u", "--update", "--upgrade",
         action="store_true",
         help="Update the tool by pulling the latest changes from git",
     )

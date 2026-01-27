@@ -11,15 +11,23 @@ A Terminal User Interface (TUI) application for uploading files to Preservica.
 
 ## Requirements
 
+### git
+
+```bash
+# Windows
+winget install --id Git.Git -e --source winget
+
+# Linux (Fedora/RHEL/Rocky)
+sudo dnf install git
+```
+
 ### uv
 
 ```bash
 # Windows
-
 winget install --id=astral-sh.uv  -e
 
-### Linux
-
+# Linux
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
