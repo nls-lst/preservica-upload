@@ -48,6 +48,23 @@ S3_THRESHOLD_MB = int(os.getenv("PRESERVICA_S3_THRESHOLD", "100"))
 TEMP_FOLDER = os.getenv("PRESERVICA_TEMP_FOLDER")
 
 
+def _supports_unicode() -> bool:
+    """Detect if the terminal supports Unicode/emoji output."""
+    encoding = getattr(sys.stdout, "encoding", "") or ""
+    return encoding.lower().replace("-", "") == "utf8"
+
+
+_UNICODE = _supports_unicode()
+ICON_WAIT = "⏳" if _UNICODE else "..."
+ICON_OK = "✅" if _UNICODE else "[OK]"
+ICON_ERROR = "❌" if _UNICODE else "[ERR]"
+ICON_FILE = "📄" if _UNICODE else "[file]"
+ICON_FOLDER = "📁" if _UNICODE else "[dir]"
+ICON_PKG = "📦" if _UNICODE else "[pkg]"
+ICON_UP = "⬆️" if _UNICODE else "^"
+ICON_UPLOAD = "📤" if _UNICODE else ">>"
+
+
 class UploadProgressMessage(Message):
     """Message sent when upload progress updates."""
 
@@ -97,7 +114,7 @@ class PreservicaTree(Tree):
         self.entity_client = None
         self.folder_map = {}  # Maps tree node IDs to folder UUIDs
         # Add initial loading message
-        self.root.add_leaf("⏳ Loading folders...")
+        self.root.add_leaf(f"{ICON_WAIT} Loading folders...")
 
     async def on_mount(self) -> None:
         """Initialize the Preservica connection and load root folders."""
@@ -111,7 +128,7 @@ class PreservicaTree(Tree):
         except Exception as e:
             # Clear loading message and show error
             self.root.remove_children()
-            self.root.add_leaf(f"❌ Error: {e}")
+            self.root.add_leaf(f"{ICON_ERROR} Error: {e}")
 
     async def load_root_folders(self) -> None:
         """Load root folders from Preservica."""
@@ -125,7 +142,7 @@ class PreservicaTree(Tree):
                     node.add_leaf("Loading...")
                 elif entity.entity_type.name == "ASSET":
                     # Add assets as non-selectable leaves
-                    self.root.add_leaf(f"📄 {entity.title}")
+                    self.root.add_leaf(f"{ICON_FILE} {entity.title}")
         except Exception as e:
             self.root.add_leaf(f"Error loading folders: {e}")
 
@@ -150,7 +167,7 @@ class PreservicaTree(Tree):
                         child_node.add_leaf("Loading...")
                     elif entity.entity_type.name == "ASSET":
                         # Add assets as non-selectable leaves
-                        node.add_leaf(f"📄 {entity.title}")
+                        node.add_leaf(f"{ICON_FILE} {entity.title}")
             except Exception as e:
                 node.add_leaf(f"Error: {e}")
 
@@ -341,13 +358,15 @@ class PreservicaUploadApp(App):
         """Upload the selected file to the selected Preservica folder."""
         if not self.selected_local_path:
             self.call_from_thread(
-                self.update_status, "❌ Please select a local file or folder first"
+                self.update_status,
+                f"{ICON_ERROR} Please select a local file or folder first",
             )
             return
 
         if not self.selected_preservica_folder:
             self.call_from_thread(
-                self.update_status, "❌ Please select a Preservica folder first"
+                self.update_status,
+                f"{ICON_ERROR} Please select a Preservica folder first",
             )
             return
 
@@ -355,13 +374,13 @@ class PreservicaUploadApp(App):
             # Show file size
             file_size_mb = self.selected_local_path.stat().st_size / (1024 * 1024)
             self.call_from_thread(
-                self.update_status, f"📁 File size: {file_size_mb:.2f} MB"
+                self.update_status, f"{ICON_FOLDER} File size: {file_size_mb:.2f} MB"
             )
 
             # Show folder being uploaded to
             self.call_from_thread(
                 self.update_status,
-                f"📤 Uploading to folder: {self.selected_preservica_folder.title}",
+                f"{ICON_UPLOAD} Uploading to folder: {self.selected_preservica_folder.title}",
             )
 
             if self.selected_local_path.is_file():
@@ -370,7 +389,7 @@ class PreservicaUploadApp(App):
 
                 # Create asset package
                 self.call_from_thread(
-                    self.update_status, f"📦 Creating asset package..."
+                    self.update_status, f"{ICON_PKG} Creating asset package..."
                 )
                 package_kwargs = dict(
                     preservation_file=str(self.selected_local_path),
@@ -384,10 +403,11 @@ class PreservicaUploadApp(App):
                 package_size_mb = os.path.getsize(zip_package) / (1024 * 1024)
                 self.call_from_thread(
                     self.update_status,
-                    f"📦 Package created: {os.path.basename(zip_package)}",
+                    f"{ICON_PKG} Package created: {os.path.basename(zip_package)}",
                 )
                 self.call_from_thread(
-                    self.update_status, f"📦 Package size: {package_size_mb:.2f} MB"
+                    self.update_status,
+                    f"{ICON_PKG} Package size: {package_size_mb:.2f} MB",
                 )
 
                 # Determine upload method based on package size
@@ -395,11 +415,13 @@ class PreservicaUploadApp(App):
                 if use_s3:
                     self.call_from_thread(
                         self.update_status,
-                        f"📦 Large file detected - using S3 upload...",
+                        f"{ICON_PKG} Large file detected - using S3 upload...",
                     )
 
                 # Upload the package
-                self.call_from_thread(self.update_status, f"⬆️  Starting upload...")
+                self.call_from_thread(
+                    self.update_status, f"{ICON_UP} Starting upload..."
+                )
 
                 # Show progress bar
                 def show_progress():
@@ -437,14 +459,14 @@ class PreservicaUploadApp(App):
                 self.call_from_thread(hide_progress)
                 self.call_from_thread(
                     self.update_status,
-                    f"✅ Upload complete! Check Preservica web UI for ingest progress.",
+                    f"{ICON_OK} Upload complete! Check Preservica web UI for ingest progress.",
                 )
 
             elif self.selected_local_path.is_dir():
                 # Upload folder by zipping it first
                 self.call_from_thread(
                     self.update_status,
-                    f"📦 Zipping folder {self.selected_local_path.name}...",
+                    f"{ICON_PKG} Zipping folder {self.selected_local_path.name}...",
                 )
 
                 # Create a temporary zip file of the folder
@@ -464,10 +486,11 @@ class PreservicaUploadApp(App):
                 package_size_mb = os.path.getsize(zip_file) / (1024 * 1024)
                 self.call_from_thread(
                     self.update_status,
-                    f"📦 Package created: {os.path.basename(zip_file)}",
+                    f"{ICON_PKG} Package created: {os.path.basename(zip_file)}",
                 )
                 self.call_from_thread(
-                    self.update_status, f"📦 Package size: {package_size_mb:.2f} MB"
+                    self.update_status,
+                    f"{ICON_PKG} Package size: {package_size_mb:.2f} MB",
                 )
 
                 # Determine upload method based on package size
@@ -475,11 +498,13 @@ class PreservicaUploadApp(App):
                 if use_s3:
                     self.call_from_thread(
                         self.update_status,
-                        f"📦 Large file detected - using S3 upload...",
+                        f"{ICON_PKG} Large file detected - using S3 upload...",
                     )
 
                 # Upload the zip directly
-                self.call_from_thread(self.update_status, f"⬆️  Starting upload...")
+                self.call_from_thread(
+                    self.update_status, f"{ICON_UP} Starting upload..."
+                )
 
                 # Show progress bar
                 def show_progress():
@@ -517,20 +542,22 @@ class PreservicaUploadApp(App):
                 self.call_from_thread(hide_progress)
                 self.call_from_thread(
                     self.update_status,
-                    f"✅ Upload complete! Check Preservica web UI for ingest progress.",
+                    f"{ICON_OK} Upload complete! Check Preservica web UI for ingest progress.",
                 )
 
             else:
                 self.call_from_thread(
                     self.update_status,
-                    "❌ Selected path is neither a file nor a folder",
+                    f"{ICON_ERROR} Selected path is neither a file nor a folder",
                 )
 
         except Exception as e:
             import traceback
 
             error_detail = traceback.format_exc()
-            self.call_from_thread(self.update_status, f"❌ Upload failed: {e}")
+            self.call_from_thread(
+                self.update_status, f"{ICON_ERROR} Upload failed: {e}"
+            )
 
             def hide_progress_on_error():
                 progress_bar = self.query_one("#progress-bar", ProgressBar)
@@ -608,7 +635,9 @@ def main():
             print(result.stdout)
             if result.stderr:
                 print(result.stderr)
-            print("\n✅ Update complete! Run 'preservica-upload' to use the updated version.")
+            print(
+                "\n✅ Update complete! Run 'preservica-upload' to use the updated version."
+            )
         except subprocess.CalledProcessError as e:
             print(f"❌ Error during reinstall: {e}")
             print(e.stderr)
