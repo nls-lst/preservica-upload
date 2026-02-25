@@ -588,15 +588,33 @@ def main():
             print(result.stdout)
             if result.stderr:
                 print(result.stderr)
-            print(
-                "\n✅ Update complete! Run 'preservica-upload' to use the updated version."
-            )
         except subprocess.CalledProcessError as e:
-            print(f"❌ Error updating: {e}")
+            print(f"❌ Error during git pull: {e}")
             print(e.stderr)
             sys.exit(1)
         except FileNotFoundError:
             print("❌ Error: git command not found. Please install git.")
+            sys.exit(1)
+
+        print("Reinstalling tool to pick up any new dependencies...\n")
+        try:
+            result = subprocess.run(
+                ["uv", "tool", "install", "-e", ".", "--reinstall"],
+                cwd=install_dir,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            print(result.stdout)
+            if result.stderr:
+                print(result.stderr)
+            print("\n✅ Update complete! Run 'preservica-upload' to use the updated version.")
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Error during reinstall: {e}")
+            print(e.stderr)
+            sys.exit(1)
+        except FileNotFoundError:
+            print("❌ Error: uv command not found. Please install uv.")
             sys.exit(1)
 
         return
