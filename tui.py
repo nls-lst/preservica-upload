@@ -28,11 +28,14 @@ from textual.binding import Binding
 from textual.reactive import reactive
 from textual.message import Message
 from textual import work
+from dotenv import load_dotenv
 from pyPreservica import (
     EntityAPI,
     UploadAPI,
 )
 
+# Load .env file if present (system environment variables take precedence)
+load_dotenv()
 
 # Get credentials from environment
 USERNAME = os.getenv("PRESERVICA_USERNAME")
