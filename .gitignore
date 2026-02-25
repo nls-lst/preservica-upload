@@ -25,3 +25,4 @@ env/
 test_*.bin
 test_*.zip
 *.tmp
+/tests

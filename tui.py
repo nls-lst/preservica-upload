@@ -4,7 +4,9 @@ Textual TUI for Preservica Upload Tool
 
 import os
 import sys
+import time
 import shutil
+import zipfile
 import tempfile
 import asyncio
 import threading
@@ -68,16 +70,9 @@ ICON_UPLOAD = "📤" if _UNICODE else ">>"
 class UploadProgressMessage(Message):
     """Message sent when upload progress updates."""
 
-    def __init__(self, percentage: int) -> None:
+    def __init__(self, percentage: int, eta_str: str = "") -> None:
         self.percentage = percentage
-        super().__init__()
-
-
-class UploadProgressMessage(Message):
-    """Message sent when upload progress updates."""
-
-    def __init__(self, percentage: int) -> None:
-        self.percentage = percentage
+        self.eta_str = eta_str
         super().__init__()
 
 
@@ -91,6 +86,7 @@ class UploadProgressCallback:
         self._lock = threading.Lock()
         self.app = app
         self._last_percentage = -1
+        self._start_time = time.monotonic()
 
     def __call__(self, bytes_amount):
         with self._lock:
@@ -102,8 +98,17 @@ class UploadProgressCallback:
                 percentage == 100 and self._last_percentage != 100
             ):
                 self._last_percentage = percentage
-                # post_message is thread-safe and doesn't block
-                self.app.post_message(UploadProgressMessage(percentage))
+                eta_str = ""
+                elapsed = time.monotonic() - self._start_time
+                if elapsed > 1 and self._seen_so_far > 0 and percentage < 100:
+                    rate = self._seen_so_far / elapsed
+                    remaining = (self._size - self._seen_so_far) / rate
+                    eta_str = (
+                        f"~{remaining:.0f}s"
+                        if remaining < 60
+                        else f"~{remaining/60:.1f}m"
+                    )
+                self.app.post_message(UploadProgressMessage(percentage, eta_str))
 
 
 class PreservicaTree(Tree):
@@ -352,6 +357,10 @@ class PreservicaUploadApp(App):
         """Handle upload progress messages."""
         progress_bar = self.query_one("#progress-bar", ProgressBar)
         progress_bar.update(progress=message.percentage)
+        if message.eta_str:
+            self.update_status(
+                f"{ICON_UP} Uploading: {message.percentage}% - {message.eta_str} remaining"
+            )
 
     @work(thread=True, exclusive=True)
     def action_upload(self) -> None:
@@ -463,24 +472,74 @@ class PreservicaUploadApp(App):
                 )
 
             elif self.selected_local_path.is_dir():
-                # Upload folder by zipping it first
+                # Collect all files first for accurate progress
+                all_files = []
+                total_bytes = 0
+                for root, dirs, files in os.walk(self.selected_local_path):
+                    for file in files:
+                        file_path = Path(root) / file
+                        file_size = file_path.stat().st_size
+                        all_files.append((file_path, file_size))
+                        total_bytes += file_size
+
+                total_mb = total_bytes / (1024 * 1024)
                 self.call_from_thread(
                     self.update_status,
-                    f"{ICON_PKG} Zipping folder {self.selected_local_path.name}...",
+                    f"{ICON_PKG} Zipping {len(all_files)} files ({total_mb:.1f} MB)...",
                 )
+
+                # Show progress bar for zip phase
+                def show_zip_progress():
+                    progress_bar = self.query_one("#progress-bar", ProgressBar)
+                    progress_bar.display = True
+                    progress_bar.update(total=100, progress=0)
+
+                self.call_from_thread(show_zip_progress)
 
                 # Create a temporary zip file of the folder
                 temp_dir = TEMP_FOLDER if TEMP_FOLDER else tempfile.gettempdir()
-                zip_basename = self.selected_local_path.name
-                zip_path = os.path.join(temp_dir, zip_basename)
+                zip_file_path = Path(temp_dir) / f"{self.selected_local_path.name}.zip"
 
-                # Create zip archive (without .zip extension, shutil adds it)
-                zip_file = shutil.make_archive(
-                    zip_path,
-                    "zip",
-                    self.selected_local_path.parent,
-                    self.selected_local_path.name,
-                )
+                zip_start = time.monotonic()
+                bytes_done = 0
+                last_pct = -1
+
+                with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                    for file_path, file_size in all_files:
+                        arcname = file_path.relative_to(self.selected_local_path.parent)
+                        zf.write(file_path, arcname)
+                        bytes_done += file_size
+                        pct = (
+                            int(bytes_done / total_bytes * 100)
+                            if total_bytes > 0
+                            else 100
+                        )
+                        if pct != last_pct:
+                            last_pct = pct
+                            elapsed = time.monotonic() - zip_start
+                            if elapsed > 1 and bytes_done > 0:
+                                rate = bytes_done / elapsed
+                                remaining = (total_bytes - bytes_done) / rate
+                                eta = (
+                                    f"{remaining:.0f}s"
+                                    if remaining < 60
+                                    else f"{remaining/60:.1f}m"
+                                )
+                                status = (
+                                    f"{ICON_PKG} Zipping: {pct}% - ~{eta} remaining"
+                                )
+                            else:
+                                status = f"{ICON_PKG} Zipping: {pct}%"
+
+                            def update_zip_ui(p=pct, s=status):
+                                self.query_one("#progress-bar", ProgressBar).update(
+                                    progress=p
+                                )
+                                self.update_status(s)
+
+                            self.call_from_thread(update_zip_ui)
+
+                zip_file = str(zip_file_path)
 
                 # Show package info
                 package_size_mb = os.path.getsize(zip_file) / (1024 * 1024)
