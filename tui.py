@@ -44,6 +44,8 @@ SERVER = os.getenv("PRESERVICA_SERVER")
 BUCKET = os.getenv("PRESERVICA_BUCKET")
 # S3 upload threshold in MB (default: 100MB)
 S3_THRESHOLD_MB = int(os.getenv("PRESERVICA_S3_THRESHOLD", "100"))
+# Optional: override temp/export folder for package creation
+TEMP_FOLDER = os.getenv("PRESERVICA_TEMP_FOLDER")
 
 
 class UploadProgressMessage(Message):
@@ -370,10 +372,13 @@ class PreservicaUploadApp(App):
                 self.call_from_thread(
                     self.update_status, f"📦 Creating asset package..."
                 )
-                zip_package = simple_asset_package(
+                package_kwargs = dict(
                     preservation_file=str(self.selected_local_path),
                     parent_folder=self.selected_preservica_folder,
                 )
+                if TEMP_FOLDER:
+                    package_kwargs["export_folder"] = TEMP_FOLDER
+                zip_package = simple_asset_package(**package_kwargs)
 
                 # Show package info
                 package_size_mb = os.path.getsize(zip_package) / (1024 * 1024)
@@ -443,7 +448,7 @@ class PreservicaUploadApp(App):
                 )
 
                 # Create a temporary zip file of the folder
-                temp_dir = tempfile.gettempdir()
+                temp_dir = TEMP_FOLDER if TEMP_FOLDER else tempfile.gettempdir()
                 zip_basename = self.selected_local_path.name
                 zip_path = os.path.join(temp_dir, zip_basename)
 
